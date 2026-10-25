@@ -1,0 +1,141 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "collections-manager/browser",
+  "version": "0.2.0",
+  "title": "Collections Browser",
+  "category": "widgets",
+  "icon": "index-card",
+  "description": "A row of collections. Click one to expand a carousel of its posts without leaving the page.",
+  "keywords": [
+    "collection",
+    "carousel",
+    "curated",
+    "posts"
+  ],
+  "attributes": {
+    "showAllCollections": {
+      "type": "boolean",
+      "default": true
+    },
+    "collectionIds": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "default": []
+    },
+    "visibleCount": {
+      "type": "number",
+      "default": 0
+    },
+    "useGlobalStyles": {
+      "type": "boolean",
+      "default": true
+    },
+    "borderRadius": {
+      "type": "number",
+      "default": 12
+    },
+    "borderWidth": {
+      "type": "number",
+      "default": 0
+    },
+    "showShadow": {
+      "type": "boolean",
+      "default": true
+    },
+    "borderColor": {
+      "type": "string",
+      "default": ""
+    },
+    "shadowColor": {
+      "type": "string",
+      "default": ""
+    },
+    "shadowOffsetX": {
+      "type": "number",
+      "default": 0
+    },
+    "shadowOffsetY": {
+      "type": "number",
+      "default": 10
+    },
+    "shadowBlur": {
+      "type": "number",
+      "default": 24
+    },
+    "shadowSpread": {
+      "type": "number",
+      "default": 0
+    },
+    "collectionTextPosition": {
+      "type": "string",
+      "default": "overlay"
+    },
+    "cardTextPosition": {
+      "type": "string",
+      "default": "overlay"
+    },
+    "textLayout": {
+      "type": "string",
+      "default": "stack"
+    },
+    "titleFontSize": {
+      "type": "number",
+      "default": 18
+    },
+    "countFontSize": {
+      "type": "number",
+      "default": 12
+    },
+    "cardTitleFontSize": {
+      "type": "number",
+      "default": 15
+    },
+    "itemGap": {
+      "type": "number",
+      "default": 14
+    },
+    "cardGap": {
+      "type": "number",
+      "default": 12
+    },
+    "panelRadius": {
+      "type": "number",
+      "default": 16
+    },
+    "panelPadding": {
+      "type": "number",
+      "default": 18
+    },
+    "panelBackground": {
+      "type": "string",
+      "default": ""
+    },
+    "navBackground": {
+      "type": "string",
+      "default": ""
+    },
+    "navColor": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "supports": {
+    "html": false,
+    "align": [
+      "wide",
+      "full"
+    ],
+    "spacing": {
+      "margin": true,
+      "padding": true
+    }
+  },
+  "textdomain": "collections-manager",
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "viewScript": "file:./view.js",
+  "render": "file:./render.php"
+}

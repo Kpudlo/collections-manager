@@ -1,0 +1,17 @@
+{
+	"name": "collections-manager",
+  "version": "0.2.0",
+	"description": "Curated post collections and a streaming-style browser block.",
+	"author": "Bemis Tech",
+	"license": "GPL-2.0-or-later",
+	"scripts": {
+		"build": "wp-scripts build",
+		"start": "wp-scripts start"
+	},
+	"devDependencies": {
+		"@wordpress/scripts": "^30.15.0"
+	},
+	"dependencies": {
+		"embla-carousel": "^8.6.0"
+	}
+}

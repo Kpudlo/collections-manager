@@ -1,0 +1,68 @@
+name: Publish Collections Manager
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to upload
+        required: true
+        default: "0.2.2"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      - name: Build zip and metadata
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          HEADER=$(grep -m1 -E '^[[:space:]*]*Version:' collections-manager.php | sed -E 's/.*Version:[[:space:]]*//' | tr -d '\r[:space:]')
+          if [ "$HEADER" != "$VERSION" ]; then
+            echo "::error::collections-manager.php Version ($HEADER) does not match release tag ($VERSION)"
+            exit 1
+          fi
+          mkdir -p /tmp/dist
+          rsync -a \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='node_modules/' \
+            --exclude='.DS_Store' \
+            ./ /tmp/dist/collections-manager/
+          cd /tmp/dist
+          zip -r collections-manager.zip collections-manager
+          cp collections-manager.zip "collections-manager-$VERSION.zip"
+          cat > collections-manager.json <<EOF
+          {
+            "version": "$VERSION",
+            "download_url": "https://updates.bemistech.com/collections-manager/collections-manager-$VERSION.zip",
+            "details_url": "https://github.com/${REPOSITORY}/releases/tag/${RELEASE_TAG}"
+          }
+          EOF
+
+      - name: Upload zip to the GitHub release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: /tmp/dist/collections-manager.zip
+
+      - name: Upload to R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          npx --yes wrangler@4 r2 object put "w7-p7/collections-manager/collections-manager-$VERSION.zip" --file "/tmp/dist/collections-manager-$VERSION.zip" --remote --content-type application/zip --cache-control "public, max-age=31536000, immutable"
+          npx --yes wrangler@4 r2 object put "w7-p7/collections-manager.json" --file /tmp/dist/collections-manager.json --remote --content-type application/json --cache-control "public, max-age=300"
