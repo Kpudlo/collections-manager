@@ -114,7 +114,12 @@ $wrapper_attrs = get_block_wrapper_attributes(
 							<?php esc_html_e( 'Close', 'collections-manager' ); ?>
 						</button>
 					</div>
-					<div class="cm-browser__carousel">
+					<div
+						class="cm-browser__carousel"
+						role="region"
+						aria-roledescription="<?php esc_attr_e( 'carousel', 'collections-manager' ); ?>"
+						aria-label="<?php echo esc_attr( $collection['title'] ); ?>"
+					>
 						<?php if ( empty( $collection['items'] ) ) : ?>
 							<p class="cm-browser__empty"><?php
 							if ( ! empty( $is_youtube ) ) {

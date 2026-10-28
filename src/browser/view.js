@@ -11,6 +11,7 @@ const RAIL_OPTIONS = {
 	dragFree: ! reduceMotion,
 	duration: reduceMotion ? 0 : 28,
 	skipSnaps: true,
+	watchSlides: false,
 };
 
 const CAROUSEL_OPTIONS = {
@@ -18,6 +19,7 @@ const CAROUSEL_OPTIONS = {
 	containScroll: 'trimSnaps',
 	duration: reduceMotion ? 0 : 32,
 	skipSnaps: true,
+	watchSlides: false,
 };
 
 function initBrowser( root ) {
@@ -28,12 +30,13 @@ function initBrowser( root ) {
 		return;
 	}
 
-	function bindSlider( viewport, prev, next, options ) {
+	function bindSlider( viewport, prev, next, options, keyboardRoot ) {
 		if ( ! viewport ) {
 			return null;
 		}
 
 		const embla = EmblaCarousel( viewport, options );
+		const keysRoot = keyboardRoot || viewport;
 		const syncNav = () => {
 			const canPrev = embla.canScrollPrev();
 			const canNext = embla.canScrollNext();
@@ -58,19 +61,42 @@ function initBrowser( root ) {
 			next.addEventListener( 'click', () => embla.scrollNext() );
 		}
 
+		keysRoot.addEventListener( 'keydown', ( event ) => {
+			if ( event.altKey || event.ctrlKey || event.metaKey ) {
+				return;
+			}
+			if ( event.key === 'ArrowLeft' ) {
+				event.preventDefault();
+				embla.scrollPrev();
+			} else if ( event.key === 'ArrowRight' ) {
+				event.preventDefault();
+				embla.scrollNext();
+			}
+		} );
+
+		viewport.addEventListener( 'focusin', ( event ) => {
+			const slides = embla.slideNodes();
+			const index = slides.findIndex( ( slide ) => slide.contains( event.target ) );
+			if ( index >= 0 && ! embla.slidesInView().includes( index ) ) {
+				embla.scrollTo( index );
+			}
+		} );
+
 		return embla;
 	}
 
 	const rail = root.querySelector( '.cm-browser__rail' );
 	const railViewport = root.querySelector( '.cm-browser__rail-viewport' );
-	if ( rail && railViewport ) {
-		bindSlider(
-			railViewport,
-			rail.querySelector( ':scope > .cm-browser__nav--prev' ),
-			rail.querySelector( ':scope > .cm-browser__nav--next' ),
-			RAIL_OPTIONS
-		);
-	}
+	const railEmbla =
+		rail && railViewport
+			? bindSlider(
+					railViewport,
+					rail.querySelector( ':scope > .cm-browser__nav--prev' ),
+					rail.querySelector( ':scope > .cm-browser__nav--next' ),
+					RAIL_OPTIONS,
+					rail
+			  )
+			: null;
 
 	const carousels = new Map();
 
@@ -79,7 +105,8 @@ function initBrowser( root ) {
 			carousel.querySelector( '.cm-browser__viewport' ),
 			carousel.querySelector( '.cm-browser__nav--prev' ),
 			carousel.querySelector( '.cm-browser__nav--next' ),
-			CAROUSEL_OPTIONS
+			CAROUSEL_OPTIONS,
+			carousel
 		);
 		const panel = carousel.closest( '.cm-browser__panel' );
 		if ( embla && panel ) {
@@ -96,12 +123,92 @@ function initBrowser( root ) {
 		}
 	}
 
+	function syncRail() {
+		if ( ! railEmbla ) {
+			return;
+		}
+		const snap = railEmbla.selectedScrollSnap();
+		railEmbla.reInit();
+		railEmbla.scrollTo( snap, true );
+	}
+
+	function afterRailSettle( callback ) {
+		if ( reduceMotion ) {
+			callback();
+			return;
+		}
+		window.setTimeout( callback, 560 );
+	}
+
+	function activatePanel( id ) {
+		panels.forEach( ( panel ) => {
+			setPanelOpen( panel, panel.dataset.collectionId === id );
+		} );
+		const embla = carousels.get( id );
+		if ( ! embla ) {
+			return;
+		}
+		embla.reInit();
+		embla.scrollTo( 0, true );
+	}
+
+	let swapTimer = 0;
+
+	function switchCollection( id ) {
+		const inner = stage.querySelector( '.cm-browser__stage-inner' );
+		const next = panels.find( ( panel ) => panel.dataset.collectionId === id );
+
+		tabs.forEach( ( tab ) => {
+			tab.setAttribute(
+				'aria-expanded',
+				tab.dataset.collectionId === id ? 'true' : 'false'
+			);
+		} );
+
+		window.clearTimeout( swapTimer );
+
+		if ( reduceMotion || ! inner || ! next ) {
+			activatePanel( id );
+			return;
+		}
+
+		const fromHeight = inner.getBoundingClientRect().height;
+		inner.style.height = fromHeight + 'px';
+		inner.classList.add( 'is-swapping' );
+
+		swapTimer = window.setTimeout( () => {
+			activatePanel( id );
+			window.requestAnimationFrame( () => {
+				const toHeight = next.getBoundingClientRect().height;
+				inner.classList.remove( 'is-swapping' );
+				inner.style.height = Math.max( toHeight, 0 ) + 'px';
+
+				const release = ( event ) => {
+					if ( event && event.propertyName && event.propertyName !== 'height' ) {
+						return;
+					}
+					inner.style.height = '';
+					inner.removeEventListener( 'transitionend', release );
+				};
+				inner.addEventListener( 'transitionend', release );
+				window.setTimeout( () => release(), 420 );
+			} );
+		}, 180 );
+	}
+
 	function closeAll( restoreFocus ) {
 		const openTab = tabs.find( ( tab ) => tab.getAttribute( 'aria-expanded' ) === 'true' );
+		window.clearTimeout( swapTimer );
+		const inner = stage.querySelector( '.cm-browser__stage-inner' );
+		if ( inner ) {
+			inner.classList.remove( 'is-swapping' );
+			inner.style.height = '';
+		}
 		root.classList.remove( 'is-open' );
 		stage.classList.remove( 'is-open' );
 		tabs.forEach( ( tab ) => tab.setAttribute( 'aria-expanded', 'false' ) );
 		panels.forEach( ( panel ) => setPanelOpen( panel, false ) );
+		afterRailSettle( syncRail );
 		if ( restoreFocus && openTab ) {
 			openTab.focus();
 		}
@@ -118,6 +225,12 @@ function initBrowser( root ) {
 			return;
 		}
 
+		const wasOpen = root.classList.contains( 'is-open' );
+		if ( wasOpen ) {
+			switchCollection( id );
+			return;
+		}
+
 		root.classList.add( 'is-open' );
 		stage.classList.add( 'is-open' );
 		tabs.forEach( ( tab ) => {
@@ -130,10 +243,14 @@ function initBrowser( root ) {
 			setPanelOpen( panel, panel.dataset.collectionId === id );
 		} );
 
-		const panel = panels.find( ( item ) => item.dataset.collectionId === id );
-		if ( panel ) {
-			panel.focus( { preventScroll: true } );
+		if ( ! fromTab ) {
+			const panel = panels.find( ( item ) => item.dataset.collectionId === id );
+			if ( panel ) {
+				panel.focus();
+			}
 		}
+
+		afterRailSettle( syncRail );
 
 		const embla = carousels.get( id );
 		if ( ! embla ) {
@@ -145,11 +262,20 @@ function initBrowser( root ) {
 			embla.scrollTo( 0, true );
 		};
 
-		requestAnimationFrame( settle );
-		if ( ! reduceMotion ) {
-			window.setTimeout( settle, 520 );
-			stage.addEventListener( 'transitionend', settle, { once: true } );
+		if ( reduceMotion ) {
+			settle();
+			return;
 		}
+
+		window.setTimeout( settle, 620 );
+		const onStageEnd = ( event ) => {
+			if ( event.target !== stage || event.propertyName !== 'grid-template-rows' ) {
+				return;
+			}
+			stage.removeEventListener( 'transitionend', onStageEnd );
+			settle();
+		};
+		stage.addEventListener( 'transitionend', onStageEnd );
 	}
 
 	tabs.forEach( ( tab ) => {
